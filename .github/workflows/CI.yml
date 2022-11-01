@@ -349,7 +349,7 @@ jobs:
 
   build_linux:
     name: Linux
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-${{ matrix.dist }}
     needs: [check_changelog, setup_release]
     strategy:
       fail-fast: false  # false to test all, true to fail entire job if any fail
@@ -357,8 +357,22 @@ jobs:
         include:  # package these differently
           - type: cpack
             EXTRA_ARGS: ''
+            dist: 20.04
           - type: appimage
             EXTRA_ARGS: '-DSUNSHINE_CONFIGURE_APPIMAGE=ON'
+            dist: 20.04
+          - type: cpack
+            EXTRA_ARGS: ''
+            dist: 22.04
+          - type: appimage
+            EXTRA_ARGS: '-DSUNSHINE_CONFIGURE_APPIMAGE=ON'
+            dist: 22.04
+          - type: cpack
+            EXTRA_ARGS: ''
+            dist: 18.04
+          - type: appimage
+            EXTRA_ARGS: '-DSUNSHINE_CONFIGURE_APPIMAGE=ON'
+            dist: 18.04
 
     steps:
       - name: Checkout
@@ -375,13 +389,9 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y \
             build-essential \
-            cmake \
             gcc-10 \
             g++-10 \
             libavdevice-dev \
-            libboost-filesystem-dev \
-            libboost-log-dev \
-            libboost-thread-dev \
             libcap-dev \
             libdrm-dev \
             libevdev-dev \
@@ -397,16 +407,30 @@ jobs:
             libxrandr-dev \
             libxtst-dev \
             wget
-          # # Ubuntu 20.04+ packages
-          # libboost-filesystem-dev
-          # libboost-log-dev
-          # libboost-thread-dev
 
-          # # Ubuntu 18.04 packages
-          # libboost-filesystem1.71-dev \
-          # libboost-log1.71-dev \
-          # libboost-regex1.71-dev \
-          # libboost-thread1.71-dev \
+          if [[ ${{ matrix.dist }} == "18.04" ]]; then
+            # Ubuntu 18.04 packages
+            sudo apt-get install -y \
+              libboost-filesystem1.71-dev \
+              libboost-log1.71-dev \
+              libboost-regex1.71-dev \
+              libboost-thread1.71-dev \
+
+            # Install cmake
+            wget https://cmake.org/files/v3.22/cmake-3.22.2-linux-x86_64.sh
+            chmod +x cmake-3.22.2-linux-x86_64.sh
+            mkdir /opt/cmake
+            ./cmake-3.22.2-linux-x86_64.sh --prefix=/opt/cmake --skip-license
+            ln --force --symbolic /opt/cmake/bin/cmake /usr/local/bin/cmake
+            cmake --version
+          else
+            # Ubuntu 20.04+ packages
+            sudo apt-get install -y \
+              cmake \
+              libboost-filesystem-dev \
+              libboost-log-dev \
+              libboost-thread-dev \
+          fi
 
           # clean apt cache
           sudo apt-get clean
@@ -423,14 +447,6 @@ jobs:
           sudo chmod a+x /root/cuda.run
           sudo /root/cuda.run --silent --toolkit --toolkitpath=/usr --no-opengl-libs --no-man-page --no-drm
           sudo rm /root/cuda.run
-
-          # # Install cmake (necessary for 18.04)
-          # wget https://cmake.org/files/v3.22/cmake-3.22.2-linux-x86_64.sh
-          # chmod +x cmake-3.22.2-linux-x86_64.sh
-          # mkdir /opt/cmake
-          # ./cmake-3.22.2-linux-x86_64.sh --prefix=/opt/cmake --skip-license
-          # ln --force --symbolic /opt/cmake/bin/cmake /usr/local/bin/cmake
-          # cmake --version
 
       - name: Build Linux
         run: |
@@ -459,8 +475,8 @@ jobs:
           cpack -G RPM
 
           # move
-          mv ./cpack_artifacts/Sunshine.deb ../artifacts/sunshine.deb
-          mv ./cpack_artifacts/Sunshine.rpm ../artifacts/sunshine.rpm
+          mv ./cpack_artifacts/Sunshine.deb ../artifacts/sunshine-${{ matrix.dist }}.deb
+          mv ./cpack_artifacts/Sunshine.rpm ../artifacts/sunshine-${{ matrix.dist }}.rpm  # todo - rpm not necessary to build on various distros
 
       - name: Set AppImage Version
         if: ${{ matrix.type == 'appimage' && ( needs.check_changelog.outputs.next_version_bare != needs.check_changelog.outputs.last_version ) }}  # yamllint disable-line rule:line-length
@@ -499,10 +515,10 @@ jobs:
             --output appimage
 
           # move
-          mv Sunshine*.AppImage ../artifacts/sunshine.AppImage
+          mv Sunshine*.AppImage ../artifacts/sunshine-${{ matrix.dist }}.AppImage
 
           # permissions
-          chmod +x ../artifacts/sunshine.AppImage
+          chmod +x ../artifacts/sunshine-${{ matrix.dist }}.AppImage
 
       - name: Verify AppImage
         if: ${{ matrix.type == 'appimage' }}
@@ -512,12 +528,12 @@ jobs:
 
           # rm -rf ~/.cache/appimagelint/
 
-          ./appimagelint-x86_64.AppImage ./artifacts/sunshine.AppImage
+          ./appimagelint-x86_64.AppImage ./artifacts/sunshine-${{ matrix.dist }}.AppImage
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: sunshine-linux-${{ matrix.type }}
+          name: sunshine-linux-${{ matrix.type }}-${{ matrix.dist }}
           path: artifacts/
 
       - name: Create/Update GitHub Release
