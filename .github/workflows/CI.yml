@@ -383,10 +383,36 @@ jobs:
       - name: Setup Dependencies Linux
         run: |
           sudo add-apt-repository ppa:savoury1/ffmpeg4 -y
-          # sudo add-apt-repository ppa:savoury1/boost-defaults-1.71 -y
           sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
 
-          sudo apt-get update -y
+          if [[ ${{ matrix.dist }} == "18.04" ]]; then
+            # Ubuntu 18.04 packages
+            sudo add-apt-repository ppa:savoury1/boost-defaults-1.71 -y
+
+            sudo apt-get update -y
+            sudo apt-get install -y \
+              libboost-filesystem1.71-dev \
+              libboost-log1.71-dev \
+              libboost-regex1.71-dev \
+              libboost-thread1.71-dev
+
+            # Install cmake
+            wget https://cmake.org/files/v3.22/cmake-3.22.2-linux-x86_64.sh
+            chmod +x cmake-3.22.2-linux-x86_64.sh
+            mkdir /opt/cmake
+            ./cmake-3.22.2-linux-x86_64.sh --prefix=/opt/cmake --skip-license
+            ln --force --symbolic /opt/cmake/bin/cmake /usr/local/bin/cmake
+            cmake --version
+          else
+            # Ubuntu 20.04+ packages
+            sudo apt-get update -y
+            sudo apt-get install -y \
+              cmake \
+              libboost-filesystem-dev \
+              libboost-log-dev \
+              libboost-thread-dev
+          fi
+
           sudo apt-get install -y \
             build-essential \
             gcc-10 \
@@ -407,30 +433,6 @@ jobs:
             libxrandr-dev \
             libxtst-dev \
             wget
-
-          if [[ ${{ matrix.dist }} == "18.04" ]]; then
-            # Ubuntu 18.04 packages
-            sudo apt-get install -y \
-              libboost-filesystem1.71-dev \
-              libboost-log1.71-dev \
-              libboost-regex1.71-dev \
-              libboost-thread1.71-dev \
-
-            # Install cmake
-            wget https://cmake.org/files/v3.22/cmake-3.22.2-linux-x86_64.sh
-            chmod +x cmake-3.22.2-linux-x86_64.sh
-            mkdir /opt/cmake
-            ./cmake-3.22.2-linux-x86_64.sh --prefix=/opt/cmake --skip-license
-            ln --force --symbolic /opt/cmake/bin/cmake /usr/local/bin/cmake
-            cmake --version
-          else
-            # Ubuntu 20.04+ packages
-            sudo apt-get install -y \
-              cmake \
-              libboost-filesystem-dev \
-              libboost-log-dev \
-              libboost-thread-dev \
-          fi
 
           # clean apt cache
           sudo apt-get clean
